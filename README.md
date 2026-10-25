@@ -4,8 +4,8 @@
 
 [![CI](https://github.com/r1ckyrockz/aura-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/r1ckyrockz/aura-gateway/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-![Node 22](https://img.shields.io/badge/node-22-green.svg)
-![NestJS 11](https://img.shields.io/badge/NestJS-11-e0234e.svg)
+![Node 22.12+](https://img.shields.io/badge/node-22.12%2B-green.svg)
+![NestJS 12](https://img.shields.io/badge/NestJS-12-e0234e.svg)
 
 ---
 
@@ -86,7 +86,7 @@ docker compose up -d
 docker compose exec ollama ollama pull qwen3:8b
 ```
 
-### With Node.js 22
+### With Node.js 22.12+ (24 LTS recommended)
 
 ```bash
 npm ci

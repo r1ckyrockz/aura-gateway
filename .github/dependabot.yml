@@ -4,11 +4,30 @@ updates:
     directory: /
     schedule: { interval: weekly }
     groups:
+      # Nest packages must move together (peer dependencies).
       nestjs: { patterns: ['@nestjs/*'] }
-      dev: { dependency-type: development }
+      lint: { patterns: ['eslint', '@eslint/*', 'typescript-eslint', 'eslint-*'] }
+      test:
+        {
+          patterns:
+            ['vitest', '@vitest/*', 'unplugin-swc', '@swc/*', 'supertest', '@types/supertest'],
+        }
+    ignore:
+      # TypeScript 7 (native compiler) is not yet supported by the toolchain.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      # Types follow the minimum supported Node version, not the latest.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
+    groups:
+      actions: { patterns: ['*'] }
   - package-ecosystem: docker
     directory: /
     schedule: { interval: monthly }
+    ignore:
+      # Stay on the Node.js LTS line; LTS bumps are done by hand.
+      - dependency-name: node
+        update-types: ['version-update:semver-major']

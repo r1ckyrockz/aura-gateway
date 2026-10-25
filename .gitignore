@@ -8,5 +8,6 @@ coverage/
 aura.config.yaml
 !examples/**/aura.config.yaml
 .DS_Store
+.idea/
+.vscode/
 *.log
-.idea

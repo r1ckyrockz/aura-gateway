@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- Upgraded to NestJS 12 (Nest packages are ESM; the Gateway stays CommonJS and loads them via `require(esm)`, so Node.js ≥ 22.12 is required)
+- Test runner switched from Jest to Vitest + SWC
+- Docker image now uses Node.js 24 LTS; CI tests Node 22 and 24
+- ESLint 10, TypeScript 5.9; removed unused `@nestjs/config`
+
 ## [0.1.0] - 2026-10-25
 
 ### Added

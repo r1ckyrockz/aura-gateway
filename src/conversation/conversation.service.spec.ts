@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import type { AuraConfig } from '../config/aura-config.schema';
 import { EntityDirectory } from '../home-assistant/entity-directory.service';
 import type { HomeAssistantClient } from '../home-assistant/ha.client';
@@ -28,10 +29,10 @@ const areas = new Map([
 function setup(steps: ConstructorParameters<typeof FakeLlm>[0], config: AuraConfig = testConfig()) {
   const ha = {
     enabled: true,
-    getStates: jest.fn(async () => states),
-    getAreas: jest.fn(async () => areas),
-    callService: jest.fn(async () => []),
-  } as unknown as HomeAssistantClient & { callService: jest.Mock };
+    getStates: vi.fn(async () => states),
+    getAreas: vi.fn(async () => areas),
+    callService: vi.fn(async () => []),
+  } as unknown as HomeAssistantClient & { callService: Mock };
   const directory = new EntityDirectory(ha, config);
   const policy = new PolicyService(config);
   const registry = new ToolRegistry([
