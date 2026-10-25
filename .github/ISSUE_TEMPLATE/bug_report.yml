@@ -1,0 +1,33 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you say/send, what did you expect, what did AURA do?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AURA Gateway version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: llm
+    attributes:
+      label: LLM server and model
+      placeholder: Ollama 0.6 · qwen3:8b
+  - type: input
+    id: ha
+    attributes:
+      label: Home Assistant version
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Please remove tokens and personal data.
+      render: text

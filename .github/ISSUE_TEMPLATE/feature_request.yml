@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest an idea for AURA Gateway
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What would you like AURA to do, and why?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Principles
+      options:
+        - label: This works fully locally (or the cloud part is optional and off by default)

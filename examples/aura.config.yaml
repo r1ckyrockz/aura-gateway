@@ -1,0 +1,79 @@
+# AURA Gateway — example configuration
+# Copy to ./aura.config.yaml (or point AURA_CONFIG_FILE at it) and adapt.
+# Every key is optional; omitted keys fall back to the defaults in docs/configuration.md.
+
+assistant:
+  name: Aura
+  language: en # reply language for built-in phrases and the prompt (en, de, ...)
+  timezone: Europe/Berlin
+  maxToolIterations: 6
+  persona: |
+    You are warm, calm and to the point. Use metric units.
+
+conversation:
+  ttlSeconds: 300 # forget a conversation after 5 minutes of silence
+  maxHistoryMessages: 12
+  confirmationTtlSeconds: 60
+
+homeAssistant:
+  exposure:
+    # Only these domains are ever visible to the model …
+    domains:
+      [
+        light,
+        switch,
+        cover,
+        climate,
+        fan,
+        media_player,
+        scene,
+        script,
+        sensor,
+        binary_sensor,
+        lock,
+        vacuum,
+      ]
+    # … plus these individual entities …
+    includeEntities: []
+    # … minus these.
+    excludeEntities:
+      - switch.server_rack_power
+  injectEntities: true # put a compact device list into the prompt (fewer tool calls)
+  injectEntitiesLimit: 150
+  cacheSeconds: 10
+
+policy:
+  # Profile used when nobody is identified and the room has no mapping.
+  defaultProfile: guest
+  # Actions on these domains are only executed after an explicit "yes".
+  confirmDomains: [lock, alarm_control_panel, cover]
+
+  profiles:
+    adult:
+      description: Full control
+      allowDomains: ['*']
+    child:
+      description: Lights and music in their own room only
+      allowDomains: [light, media_player]
+      areas: ['$room'] # $room = the room the request comes from
+      denyEntities: [media_player.living_room_tv]
+    guest:
+      description: Lights only
+      allowDomains: [light]
+    display:
+      description: Wall displays may read, never act
+      allowDomains: ['*']
+      readOnly: true
+
+  # Identified speakers (from voice profiles) → profile
+  speakers:
+    parent_1: adult
+    parent_2: adult
+
+  # Unidentified requests from a satellite in this area → profile
+  rooms:
+    Kids Room: child
+    Living Room: guest
+
+  # API key fingerprint (first 12 hex chars of sha256(key)) → profile
+  clients: {}
