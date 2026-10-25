@@ -1,13 +1,13 @@
 # Roadmap
 
-AURA Gateway is at **v0.1**: the core loop, policy and compatibility layers work and are tested. Next, roughly in order:
+AURA Gateway is at **v0.2**: the core loop, policy, compatibility layers, fast path, event stream and metrics work and are tested. Next, roughly in order:
 
 ## v0.2: Voice-first
 
 - [ ] Streaming answers (token streaming from the LLM → SSE/NDJSON) for faster time-to-first-word with TTS
-- [ ] Fast path for simple commands ("light on in the kitchen") without an LLM round-trip
-- [ ] WebSocket/SSE event stream for satellites and displays (thinking, speaking, pending confirmation)
-- [ ] Per-request latency metrics (Prometheus `/metrics`)
+- [x] Fast path for simple commands ("light on in the kitchen") without an LLM round-trip
+- [x] SSE event stream for satellites and displays (thinking, answering, pending confirmation)
+- [x] Per-request latency metrics (Prometheus `/metrics`)
 
 ## v0.3: Home Assistant native
 

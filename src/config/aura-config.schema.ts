@@ -36,6 +36,14 @@ export const auraConfigSchema = z.object({
       confirmationTtlSeconds: z.number().int().positive().default(60),
     })
     .prefault({}),
+  fastPath: z
+    .object({
+      /** Handle simple on/off commands without the LLM (English and German). */
+      enabled: z.boolean().default(true),
+      /** Domains the fast path may switch. */
+      domains: z.array(z.string()).default(['light', 'switch', 'fan', 'input_boolean']),
+    })
+    .prefault({}),
   homeAssistant: z
     .object({
       exposure: z

@@ -13,6 +13,9 @@ import { HaListEntitiesTool } from '../tools/builtin/ha-list-entities.tool';
 import { ToolRegistry } from '../tools/tool-registry.service';
 import { ConversationService, stripThinking } from './conversation.service';
 import { ConversationStore } from './conversation.store';
+import { FastPathService } from './fast-path.service';
+import { EventBus, type AuraEvent } from '../events/event-bus.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 const states: HaState[] = [
   { entity_id: 'light.kitchen', state: 'off', attributes: { friendly_name: 'Kitchen Light' } },
@@ -42,6 +45,10 @@ function setup(steps: ConstructorParameters<typeof FakeLlm>[0], config: AuraConf
     new HaCallServiceTool(ha, directory, policy),
   ]);
   const llm = new FakeLlm(steps);
+  const events = new EventBus();
+  const emitted: AuraEvent[] = [];
+  events.stream().subscribe((e) => emitted.push(e));
+  const metrics = new MetricsService();
   const service = new ConversationService(
     config,
     llm,
@@ -50,8 +57,11 @@ function setup(steps: ConstructorParameters<typeof FakeLlm>[0], config: AuraConf
     new ConversationStore(config),
     ha,
     directory,
+    new FastPathService(config, ha, directory, policy),
+    events,
+    metrics,
   );
-  return { service, llm, ha };
+  return { service, llm, ha, emitted, metrics };
 }
 
 describe('ConversationService', () => {
@@ -87,7 +97,7 @@ describe('ConversationService', () => {
       ],
       'The kitchen light is on.',
     ]);
-    const result = await service.converse({ text: 'Kitchen light on', speaker: 'alex' });
+    const result = await service.converse({ text: 'Make the kitchen bright', speaker: 'alex' });
     expect(ha.callService).toHaveBeenCalledWith('light', 'turn_on', {
       entity_id: ['light.kitchen'],
     });
@@ -109,7 +119,7 @@ describe('ConversationService', () => {
       ],
       'Sorry, you cannot do that.',
     ]);
-    const result = await service.converse({ text: 'Kitchen light on', room: 'Kids Room' });
+    const result = await service.converse({ text: 'Make the kitchen bright', room: 'Kids Room' });
     expect(ha.callService).not.toHaveBeenCalled();
     expect(result.actions[0]).toMatchObject({
       status: 'error',
@@ -215,6 +225,96 @@ describe('ConversationService', () => {
       'First answer',
       'two',
     ]);
+  });
+});
+
+describe('fast path', () => {
+  it('handles simple commands without the LLM', async () => {
+    const { service, llm, ha } = setup([]);
+    const result = await service.converse({ text: 'Turn on the kitchen light', speaker: 'alex' });
+    expect(result.route).toBe('fast_path');
+    expect(result.text).toBe('Kitchen Light is now on.');
+    expect(llm.requests).toHaveLength(0);
+    expect(ha.callService).toHaveBeenCalledWith('light', 'turn_on', {
+      entity_id: ['light.kitchen'],
+    });
+  });
+
+  it('answers in German and uses the request room for "Licht"', async () => {
+    const config = testConfig({ assistant: { language: 'de', timezone: 'UTC' } });
+    const { service, ha } = setup([], config);
+    const result = await service.converse({
+      text: 'Licht aus',
+      speaker: 'alex',
+      room: 'Kids Room',
+    });
+    expect(result.text).toBe('Kids Light ist jetzt aus.');
+    expect(ha.callService).toHaveBeenCalledWith('light', 'turn_off', { entity_id: ['light.kids'] });
+  });
+
+  it('enforces policy deterministically', async () => {
+    const { service, ha, llm } = setup([]);
+    const result = await service.converse({ text: 'Turn on the kitchen light', room: 'Kids Room' });
+    expect(result.route).toBe('fast_path');
+    expect(result.text).toBe("Sorry, you're not allowed to do that.");
+    expect(ha.callService).not.toHaveBeenCalled();
+    expect(llm.requests).toHaveLength(0);
+  });
+
+  it('falls back to the LLM when the target is unclear', async () => {
+    const { service, llm } = setup(['Which one?']);
+    const result = await service.converse({ text: 'Turn on the lights', speaker: 'alex' });
+    expect(result.route).toBe('llm');
+    expect(llm.requests).toHaveLength(1);
+  });
+
+  it('can be disabled', async () => {
+    const config = testConfig({ fastPath: { enabled: false } });
+    const { service } = setup(['ok'], config);
+    expect(
+      (await service.converse({ text: 'Turn on the kitchen light', speaker: 'alex' })).route,
+    ).toBe('llm');
+  });
+});
+
+describe('events & metrics', () => {
+  it('emits lifecycle events and records metrics', async () => {
+    const { service, emitted, metrics } = setup([]);
+    await service.converse({
+      text: 'Turn on the kitchen light',
+      speaker: 'alex',
+      room: 'Kitchen',
+      conversationId: 'e1',
+    });
+    expect(emitted.map((e) => e.type)).toEqual([
+      'conversation.started',
+      'tool.executed',
+      'conversation.answered',
+    ]);
+    expect(emitted.at(-1)).toMatchObject({
+      conversationId: 'e1',
+      room: 'Kitchen',
+      data: { text: 'Kitchen Light is now on.', route: 'fast_path' },
+    });
+    const text = await metrics.registry.metrics();
+    expect(text).toContain('aura_conversations_total{route="fast_path",profile="adult"} 1');
+  });
+
+  it('emits confirmation events', async () => {
+    const unlock = [
+      {
+        tool: 'ha_call_service',
+        args: { domain: 'lock', service: 'unlock', entity_id: 'lock.front_door' },
+      },
+    ];
+    const { service, emitted } = setup([unlock]);
+    await service.converse({ text: 'Unlock the door', speaker: 'alex', conversationId: 'e2' });
+    await service.converse({ text: 'yes', speaker: 'alex', conversationId: 'e2' });
+    const types = emitted.map((e) => e.type);
+    expect(types).toContain('confirmation.requested');
+    expect(emitted.find((e) => e.type === 'confirmation.resolved')?.data).toEqual({
+      outcome: 'approved',
+    });
   });
 });
 

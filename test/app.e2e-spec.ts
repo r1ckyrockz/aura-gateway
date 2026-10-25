@@ -1,4 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
+import { get, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { createApp } from '../src/bootstrap';
@@ -64,7 +66,7 @@ function haHandler(req: Recorded) {
     ];
   }
   if (req.url === '/api/template') return JSON.stringify([{ e: 'light.kitchen', a: 'Kitchen' }]);
-  if (req.url === '/api/services/light/turn_on') return [];
+  if (req.url?.startsWith('/api/services/light/')) return [];
   return undefined;
 }
 
@@ -124,7 +126,7 @@ describe('AURA Gateway (e2e)', () => {
     const { body } = await request(app.getHttpServer())
       .post('/v1/conversation')
       .set(auth)
-      .send({ text: 'Turn on the kitchen light', room: 'Kitchen' })
+      .send({ text: 'Make the kitchen light brighter', room: 'Kitchen' })
       .expect(200);
     expect(body.text).toBe('Kitchen light is on.');
     expect(body.actions[0]).toMatchObject({ tool: 'ha_call_service', status: 'ok' });
@@ -178,6 +180,70 @@ describe('AURA Gateway (e2e)', () => {
     expect(body.entities).toEqual([
       expect.objectContaining({ entity_id: 'light.kitchen', area: 'Kitchen', controllable: true }),
     ]);
+  });
+
+  it('handles simple commands on the fast path (no LLM call)', async () => {
+    const before = llm.requests.length;
+    const { body } = await request(app.getHttpServer())
+      .post('/v1/conversation')
+      .set(auth)
+      .send({ text: 'Turn off the kitchen light' })
+      .expect(200);
+    expect(body.route).toBe('fast_path');
+    expect(body.text).toBe('Kitchen Light is now off.');
+    expect(llm.requests.length).toBe(before);
+  });
+
+  it('GET /metrics exposes Prometheus metrics behind auth', async () => {
+    await request(app.getHttpServer()).get('/metrics').expect(401);
+    const res = await request(app.getHttpServer()).get('/metrics').set(auth).expect(200);
+    expect(res.text).toContain('aura_conversations_total');
+    expect(res.text).toContain('aura_llm_request_duration_seconds');
+  });
+
+  it('GET /v1/events streams lifecycle events (query token, room filter)', async () => {
+    const server = app.getHttpServer() as unknown as Server;
+    if (!server.listening) await new Promise<void>((resolve) => server.listen(0, resolve));
+    const { port } = server.address() as AddressInfo;
+
+    const received = new Promise<string>((resolve, reject) => {
+      const req = get(
+        `http://127.0.0.1:${port}/v1/events?room=kitchen&access_token=${KEY}`,
+        (res) => {
+          expect(res.statusCode).toBe(200);
+          let buffer = '';
+          res.on('data', (chunk: Buffer) => {
+            buffer += chunk.toString();
+            if (buffer.includes('event: conversation.answered')) {
+              req.destroy();
+              resolve(buffer);
+            }
+          });
+        },
+      );
+      req.on('error', (error) =>
+        error.message.includes('socket hang up') ? undefined : reject(error),
+      );
+    });
+    await new Promise((r) => setTimeout(r, 100));
+    await request(server)
+      .post('/v1/conversation')
+      .set(auth)
+      .send({ text: 'Hi', room: 'Living Room' })
+      .expect(200);
+    await request(server)
+      .post('/v1/conversation')
+      .set(auth)
+      .send({ text: 'Hi', room: 'Kitchen' })
+      .expect(200);
+    const stream = await received;
+    expect(stream).toContain('event: conversation.started');
+    expect(stream).toContain('"room":"Kitchen"');
+    expect(stream).not.toContain('Living Room');
+  });
+
+  it('rejects query tokens outside the event stream', async () => {
+    await request(app.getHttpServer()).get(`/v1/tools?access_token=${KEY}`).expect(401);
   });
 
   it('serves OpenAPI docs', async () => {

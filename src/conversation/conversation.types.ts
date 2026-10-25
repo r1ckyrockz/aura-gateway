@@ -19,9 +19,13 @@ export interface ActionRecord {
   result?: unknown;
 }
 
+export type Route = 'llm' | 'fast_path' | 'confirmation';
+
 export interface ConverseResult {
   conversationId: string;
   text: string;
+  /** How the answer was produced. */
+  route: Route;
   principal: { profile: string; resolvedBy: string; speaker?: string; room?: string };
   actions: ActionRecord[];
   pendingConfirmation: { id: string; summary: string; expiresAt: string } | null;

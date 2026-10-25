@@ -6,7 +6,9 @@ import { CompatModule } from './compat/compat.module';
 import { AuraConfigModule } from './config/config.module';
 import { loadConfig, type LoadedConfig } from './config/load-config';
 import { ConversationModule } from './conversation/conversation.module';
+import { EventsModule } from './events/events.module';
 import { HealthModule } from './health/health.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({})
 export class AppModule {
@@ -15,6 +17,8 @@ export class AppModule {
       module: AppModule,
       imports: [
         AuraConfigModule.forRoot(config),
+        EventsModule,
+        MetricsModule,
         HealthModule,
         ConversationModule,
         CompatModule.register({ ollama: config.env.AURA_OLLAMA_COMPAT }),

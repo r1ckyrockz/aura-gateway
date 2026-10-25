@@ -11,6 +11,9 @@ interface PhraseSet {
   failed: string;
   nothingPending: string;
   fallback: string;
+  notPermitted: string;
+  switchedOne: (name: string, action: 'on' | 'off') => string;
+  switchedMany: (count: number, action: 'on' | 'off') => string;
 }
 
 const PHRASES: Record<string, PhraseSet> = {
@@ -35,6 +38,9 @@ const PHRASES: Record<string, PhraseSet> = {
     failed: 'Sorry, that did not work.',
     nothingPending: 'There is nothing waiting for confirmation.',
     fallback: 'Sorry, I could not come up with an answer.',
+    notPermitted: "Sorry, you're not allowed to do that.",
+    switchedOne: (name, action) => `${name} is now ${action}.`,
+    switchedMany: (count, action) => `Done, ${count} lights are now ${action}.`,
   },
   de: {
     yes: [
@@ -59,6 +65,10 @@ const PHRASES: Record<string, PhraseSet> = {
     failed: 'Das hat leider nicht geklappt.',
     nothingPending: 'Es wartet nichts auf eine Bestätigung.',
     fallback: 'Darauf habe ich leider keine Antwort gefunden.',
+    notPermitted: 'Das darfst du leider nicht.',
+    switchedOne: (name, action) => `${name} ist jetzt ${action === 'on' ? 'an' : 'aus'}.`,
+    switchedMany: (count, action) =>
+      `Erledigt, ${count} Lichter sind jetzt ${action === 'on' ? 'an' : 'aus'}.`,
   },
 };
 

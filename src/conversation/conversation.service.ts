@@ -10,8 +10,11 @@ import { PolicyService } from '../policy/policy.service';
 import type { Principal } from '../policy/policy.types';
 import { ToolRegistry } from '../tools/tool-registry.service';
 import type { ToolContext } from '../tools/tool.types';
+import { EventBus } from '../events/event-bus.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { ConversationStore, type ConversationState } from './conversation.store';
 import type { ActionRecord, ConverseInput, ConverseResult } from './conversation.types';
+import { FastPathService } from './fast-path.service';
 import { classifyReply, phrases } from './phrases';
 import { buildSystemPrompt } from './system-prompt';
 
@@ -41,12 +44,56 @@ export class ConversationService {
     private readonly store: ConversationStore,
     private readonly ha: HomeAssistantClient,
     private readonly directory: EntityDirectory,
+    private readonly fastPath: FastPathService,
+    private readonly events: EventBus,
+    private readonly metrics: MetricsService,
   ) {}
 
   async converse(input: ConverseInput): Promise<ConverseResult> {
     const conversationId = input.conversationId ?? randomUUID();
-    const language = input.language ?? this.config.assistant.language;
     const principal = this.policy.resolve(input);
+    const meta = { conversationId, room: principal.room, speaker: principal.speaker };
+    const started = Date.now();
+    this.events.emit({
+      ...meta,
+      type: 'conversation.started',
+      data: { profile: principal.profileName },
+    });
+
+    const result = await this.handle(input, conversationId, principal);
+
+    const durationMs = Date.now() - started;
+    this.metrics.conversations.inc({ route: result.route, profile: principal.profileName });
+    this.metrics.conversationDuration.observe({ route: result.route }, durationMs / 1000);
+    for (const action of result.actions) {
+      this.metrics.toolCalls.inc({ tool: action.tool, status: action.status });
+      this.events.emit({
+        ...meta,
+        type: 'tool.executed',
+        data: { tool: action.tool, status: action.status },
+      });
+    }
+    if (result.pendingConfirmation) {
+      this.events.emit({
+        ...meta,
+        type: 'confirmation.requested',
+        data: { ...result.pendingConfirmation },
+      });
+    }
+    this.events.emit({
+      ...meta,
+      type: 'conversation.answered',
+      data: { text: result.text, route: result.route, durationMs },
+    });
+    return result;
+  }
+
+  private async handle(
+    input: ConverseInput,
+    conversationId: string,
+    principal: Principal,
+  ): Promise<ConverseResult> {
+    const language = input.language ?? this.config.assistant.language;
     const state = this.store.get(conversationId);
     const say = phrases(language);
     const base = { conversationId, principal: describe(principal) };
@@ -54,9 +101,14 @@ export class ConversationService {
     // 1. A pending action is waiting: only an explicit "yes" runs it.
     if (state.pending) {
       const reply = classifyReply(input.text, language, this.config.assistant.name);
-      if (reply === 'yes') return { ...base, ...(await this.runPending(state, language)) };
+      if (reply === 'yes') {
+        const outcome = await this.runPending(state, language);
+        this.emitResolved(conversationId, principal, 'approved');
+        return { ...base, ...outcome };
+      }
       const summary = state.pending.summary;
       this.store.clearPending(state);
+      this.emitResolved(conversationId, principal, reply === 'no' ? 'rejected' : 'dropped');
       if (reply === 'no') {
         this.store.append(
           state,
@@ -74,7 +126,18 @@ export class ConversationService {
       // Anything else: the pending action is dropped and the text is handled as a new request.
     }
 
-    // 2. LLM ⇄ tools loop.
+    // 2. Fast path for unambiguous on/off commands — no LLM needed.
+    const fast = await this.fastPath.tryHandle(input.text, principal, language);
+    if (fast) {
+      this.store.append(
+        state,
+        { role: 'user', content: input.text },
+        { role: 'assistant', content: fast.text },
+      );
+      return { ...base, ...empty(fast.text), route: 'fast_path', actions: fast.actions };
+    }
+
+    // 3. LLM ⇄ tools loop.
     const context: ToolContext = {
       principal,
       conversationId,
@@ -94,7 +157,11 @@ export class ConversationService {
     let pendingConfirmation: ConverseResult['pendingConfirmation'] = null;
 
     for (let i = 0; i < this.config.assistant.maxToolIterations && text === null; i++) {
-      const response = await this.llm.chat({ messages, tools: definitions });
+      const response = await this.metrics.time(this.metrics.llmDuration, () =>
+        this.llm.chat({ messages, tools: definitions }),
+      );
+      this.metrics.llmTokens.inc({ kind: 'prompt' }, response.usage?.prompt_tokens ?? 0);
+      this.metrics.llmTokens.inc({ kind: 'completion' }, response.usage?.completion_tokens ?? 0);
       usage.llmCalls++;
       usage.promptTokens += response.usage?.prompt_tokens ?? 0;
       usage.completionTokens += response.usage?.completion_tokens ?? 0;
@@ -148,7 +215,7 @@ export class ConversationService {
       { role: 'user', content: input.text },
       { role: 'assistant', content: finalText },
     );
-    return { ...base, text: finalText, actions, pendingConfirmation, usage };
+    return { ...base, text: finalText, route: 'llm', actions, pendingConfirmation, usage };
   }
 
   /** Explicit confirmation via API (e.g. a button in the app or on a satellite display). */
@@ -157,11 +224,25 @@ export class ConversationService {
     const state = this.store.get(conversationId);
     const say = phrases(lang);
     if (!state.pending) return { conversationId, ...empty(say.nothingPending) };
+    const principal = this.policy.resolve({});
     if (!approve) {
       this.store.clearPending(state);
+      this.emitResolved(conversationId, principal, 'rejected');
       return { conversationId, ...empty(say.cancelled) };
     }
-    return { conversationId, ...(await this.runPending(state, lang)) };
+    const outcome = await this.runPending(state, lang);
+    this.emitResolved(conversationId, principal, 'approved');
+    return { conversationId, ...outcome };
+  }
+
+  private emitResolved(conversationId: string, principal: Principal, outcome: string) {
+    this.events.emit({
+      type: 'confirmation.resolved',
+      conversationId,
+      room: principal.room,
+      speaker: principal.speaker,
+      data: { outcome },
+    });
   }
 
   private async runPending(state: ConversationState, language: string) {
@@ -233,6 +314,7 @@ function describe(principal: Principal): ConverseResult['principal'] {
 function empty(text: string): Omit<ConverseResult, 'conversationId' | 'principal'> {
   return {
     text,
+    route: 'confirmation',
     actions: [],
     pendingConfirmation: null,
     usage: { promptTokens: 0, completionTokens: 0, llmCalls: 0 },

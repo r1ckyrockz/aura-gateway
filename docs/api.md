@@ -49,9 +49,12 @@ Response:
     }
   ],
   "pendingConfirmation": null,
+  "route": "llm",
   "usage": { "promptTokens": 790, "completionTokens": 22, "llmCalls": 2 }
 }
 ```
+
+`route` says how the answer was produced: `fast_path` (simple command, no LLM), `llm` or `confirmation` (a reply to a held action).
 
 `actions[].status` is `ok`, `error` (including `not_permitted`) or `pending_confirmation`.
 
@@ -76,6 +79,41 @@ The tools currently offered to the model, with their JSON schemas.
 ### `GET /v1/entities?speaker=&room=`
 
 Entities visible to that principal, each with `controllable` and `requiresConfirmation`. Useful for checking your policy.
+
+### `GET /v1/events?room=&conversationId=&types=`
+
+A Server-Sent Events stream of conversation lifecycle events, for satellites, displays and dashboards. Browsers' `EventSource` can't send headers, so this endpoint also accepts `?access_token=<key>`.
+
+| Event                    | `data`                                         |
+| ------------------------ | ---------------------------------------------- |
+| `conversation.started`   | `{ profile }`                                  |
+| `tool.executed`          | `{ tool, status }`                             |
+| `confirmation.requested` | `{ id, summary, expiresAt }`                   |
+| `confirmation.resolved`  | `{ outcome: approved \| rejected \| dropped }` |
+| `conversation.answered`  | `{ text, route, durationMs }`                  |
+| `ping`                   | heartbeat every 25 s                           |
+
+Every event carries `type`, `conversationId`, `room`, `speaker` and `at`.
+
+```js
+const events = new EventSource(`/v1/events?room=Kitchen&access_token=${key}`);
+events.addEventListener('conversation.started', () => ring.pulse());
+events.addEventListener('conversation.answered', (e) => display.show(JSON.parse(e.data).data.text));
+```
+
+### `GET /metrics`
+
+Prometheus metrics. Requires an API key when keys are configured; use `authorization` in your scrape config.
+
+| Metric                               | Labels             |
+| ------------------------------------ | ------------------ |
+| `aura_conversations_total`           | `route`, `profile` |
+| `aura_conversation_duration_seconds` | `route`            |
+| `aura_llm_request_duration_seconds`  | `outcome`          |
+| `aura_llm_tokens_total`              | `kind`             |
+| `aura_tool_calls_total`              | `tool`, `status`   |
+
+It also exports the default Node.js process metrics (prefixed `aura_`).
 
 ## OpenAI-compatible API
 

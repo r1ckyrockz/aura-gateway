@@ -58,6 +58,15 @@ Every key is optional. A complete, commented example is in [`examples/aura.confi
 | `maxHistoryMessages`     | `12`    | User/assistant messages kept per conversation    |
 | `confirmationTtlSeconds` | `60`    | How long a held action waits for "yes"           |
 
+### `fastPath`
+
+| Key       | Default                             | Description                                   |
+| --------- | ----------------------------------- | --------------------------------------------- |
+| `enabled` | `true`                              | Handle simple on/off commands without the LLM |
+| `domains` | `light, switch, fan, input_boolean` | Domains the fast path may switch              |
+
+The fast path recognises English ("turn off the kitchen light", "switch on the lights in the living room", "desk lamp on") and German ("Licht aus", "mach das Licht im Wohnzimmer an", "schalte die Stehlampe ein"). It acts only when the target is unambiguous and never for domains in `policy.confirmDomains`.
+
 ### `homeAssistant`
 
 | Key                        | Default                                                                                                | Description                                            |

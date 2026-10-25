@@ -12,7 +12,7 @@ import { BlockList, isIP } from 'node:net';
 import type { Request } from 'express';
 import { AURA_ENV } from '../config/config.module';
 import type { Env } from '../config/env.schema';
-import { IS_PUBLIC } from './public.decorator';
+import { ALLOW_QUERY_TOKEN, IS_PUBLIC } from './public.decorator';
 
 const digest = (value: string) => createHash('sha256').update(value).digest();
 
@@ -58,7 +58,11 @@ export class ApiKeyGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     if (this.hasExemptions && this.isExempt(request.ip)) return true;
 
-    const token = extractToken(request);
+    const allowQuery = this.reflector.getAllAndOverride<boolean>(ALLOW_QUERY_TOKEN, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    const token = extractToken(request, allowQuery === true);
     if (token) {
       const hashed = digest(token);
       if (this.keys.some((key) => timingSafeEqual(key, hashed))) {
@@ -78,11 +82,13 @@ export class ApiKeyGuard implements CanActivate {
   }
 }
 
-function extractToken(request: Request): string | undefined {
+function extractToken(request: Request, allowQuery: boolean): string | undefined {
   const header = request.headers.authorization;
   if (header?.toLowerCase().startsWith('bearer ')) return header.slice(7).trim();
   const apiKey = request.headers['x-api-key'];
-  return typeof apiKey === 'string' ? apiKey : undefined;
+  if (typeof apiKey === 'string') return apiKey;
+  const query = (request.query as Record<string, unknown> | undefined)?.access_token;
+  return allowQuery && typeof query === 'string' ? query : undefined;
 }
 
 export function addCidr(list: BlockList, cidr: string): void {

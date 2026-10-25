@@ -1,6 +1,6 @@
 {
   "name": "aura-gateway",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AURA Gateway — the local-first brain API of AURA: connects voice satellites and apps to local LLMs and Home Assistant, with tool calling, household policies and confirmations.",
   "license": "Apache-2.0",
   "author": "Riccardo Carano",
@@ -47,6 +47,7 @@
     "@nestjs/core": "^12.2.0",
     "@nestjs/platform-express": "^12.2.0",
     "@nestjs/swagger": "^12.0.4",
+    "prom-client": "^15.1.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "yaml": "^2.9.1",

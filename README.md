@@ -28,11 +28,13 @@ AURA is made of a few parts:
 The Gateway is the single place where language turns into action. For every request it:
 
 1. **Works out who is asking.** It maps an identified speaker, an API client or the room the request came from to a **profile** (for example `adult`, `child` or `guest`).
-2. **Builds a short, speakable prompt** with the time, the room and a compact list of the devices this profile may see.
-3. **Runs a tool loop** with your local LLM. The model can list entities, read states and call Home Assistant services.
-4. **Checks every action against policy** before it runs: exposure lists, allowed domains, area limits (a child can only control their own room), read-only profiles. The model never gets to skip these checks.
-5. **Asks before sensitive actions.** Unlocking a door or opening the garage waits for a clear "yes". The Gateway checks that "yes" itself, so the LLM can never confirm on your behalf.
-6. **Speaks every common dialect:** its own REST API, an **OpenAI-compatible** `/v1/chat/completions`, and an experimental **Ollama-compatible** `/api/chat`, so Home Assistant's built-in Ollama integration can use AURA as its conversation agent.
+2. **Takes the fast path when it can.** Simple on/off commands ("turn off the kitchen light", "Licht aus") are handled in milliseconds without the LLM, with the same policy checks.
+3. **Builds a short, speakable prompt** with the time, the room and a compact list of the devices this profile may see.
+4. **Runs a tool loop** with your local LLM. The model can list entities, read states and call Home Assistant services.
+5. **Checks every action against policy** before it runs: exposure lists, allowed domains, area limits (a child can only control their own room), read-only profiles. The model never gets to skip these checks.
+6. **Asks before sensitive actions.** Unlocking a door or opening the garage waits for a clear "yes". The Gateway checks that "yes" itself, so the LLM can never confirm on your behalf.
+7. **Broadcasts what it's doing** on an event stream, so satellites and displays can show "thinking", "answering" or "waiting for confirmation".
+8. **Speaks every common dialect:** its own REST API, an **OpenAI-compatible** `/v1/chat/completions`, and an experimental **Ollama-compatible** `/api/chat`, so Home Assistant's built-in Ollama integration can use AURA as its conversation agent.
 
 ```mermaid
 flowchart LR
@@ -66,6 +68,9 @@ flowchart LR
 
 - 🏠 **Home Assistant tools:** list, read and control entities, with area awareness ("turn off the light" means the light in the room you're in).
 - 🛡️ **Household policy:** profiles per speaker, room or API key; allowed domains; per-room limits through `$room`; deny lists; read-only profiles.
+- ⚡ **Fast path** for simple on/off commands in English and German. No LLM round trip, same policy.
+- 📡 **Event stream** (`/v1/events`, Server-Sent Events) for satellites, displays and dashboards, filterable by room.
+- 📈 **Prometheus metrics** at `/metrics`: latency per route, LLM time and tokens, tool calls.
 - ✅ **Deterministic confirmations** for sensitive domains (`lock`, `alarm_control_panel`, … you choose which).
 - 🔌 **Bring your own model:** any OpenAI-compatible server. `<think>` blocks from reasoning models are stripped automatically.
 - 🔁 **Drop-in compatibility:** OpenAI Chat Completions (including SSE streaming) and Ollama `/api/chat` / `/api/tags`.

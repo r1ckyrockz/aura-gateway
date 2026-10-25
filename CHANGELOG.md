@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-26
+
+### Added
+
+- Fast path: simple on/off commands (English and German) handled without the LLM, with the same policy checks; `route` field in responses
+- Server-Sent Events stream `GET /v1/events` (room/conversation/type filters, `?access_token=` for EventSource)
+- Prometheus metrics at `GET /metrics`
+- `fastPath` config section
+
 ### Changed
 
 - Upgraded to NestJS 12 (Nest packages are ESM; the Gateway stays CommonJS and loads them via `require(esm)`, so Node.js ≥ 22.12 is required)

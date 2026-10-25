@@ -15,6 +15,10 @@ conversation:
   maxHistoryMessages: 12
   confirmationTtlSeconds: 60
 
+fastPath:
+  enabled: true # simple on/off commands without the LLM (en, de)
+  domains: [light, switch, fan, input_boolean]
+
 homeAssistant:
   exposure:
     # Only these domains are ever visible to the model …
