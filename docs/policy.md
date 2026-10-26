@@ -26,7 +26,7 @@ printf '%s' "$KEY" | sha256sum | cut -c1-12
 ## 2. What may they see?
 
 - Only **exposed** entities exist for the model (`homeAssistant.exposure`).
-- `denyEntities` hides individual entities from a profile.
+- `denyEntities` hides individual entities from a profile. Patterns work too (`name:*Heizung*`, `switch.car_*`); see [entity patterns](configuration.md#entity-patterns).
 
 ## 3. What may they do?
 
@@ -43,7 +43,7 @@ If any check fails, the tool returns `not_permitted` with a reason. The model is
 
 ## 4. Confirmations
 
-For domains in `confirmDomains`, an allowed action is **held**:
+For domains in `confirmDomains`, and for entities matching `confirmEntities`, an allowed action is **held**. `confirmEntities` matters because dangerous devices aren't always in a dangerous domain: a door opener is often just a `switch`.
 
 ```text
 User:  "Unlock the front door."

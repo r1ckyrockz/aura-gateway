@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+- Entity patterns (`switch.*_relay`, `name:*Deckenheizung`) in `includeEntities`, `excludeEntities` and `denyEntities`
+- `policy.confirmEntities`: require confirmation per entity, e.g. for door openers modelled as switches
+- Deployment guide (`docs/deployment.md`) and smoke-test script (`scripts/smoke-test.mjs`)
+
+### Changed
+
+- Areas are read from Home Assistant's registries over WebSocket, so a non-admin user is enough (template API remains as fallback)
+- Fast path treats light-named switches ("Küche Licht") as lights
+- `docker compose up` starts the Gateway only; Ollama moved to the `ollama` profile
+
+### Added
+
 - Per-utterance language detection (`assistant.detectLanguage`, `assistant.languages`): AURA answers in the language you speak, keeps the previous language for ambiguous utterances, and exposes `language` in responses and events
 
 ### Changed

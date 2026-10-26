@@ -1,6 +1,7 @@
 import { entity } from '../testing/fixtures';
 import { parseFastCommand, type FastCommand } from './fast-path';
-import { resolveTargets } from './fast-path.service';
+import type { AuraEntity } from '../home-assistant/ha.types';
+import { isLightLike, resolveTargets } from './fast-path.service';
 
 describe('parseFastCommand', () => {
   it.each<[string, FastCommand | null]>([
@@ -61,5 +62,50 @@ describe('resolveTargets', () => {
       'switch.coffee_machine',
     );
     expect(resolveTargets(cmd('coffee'), entities, undefined)).toBeNull();
+  });
+});
+
+describe('real-world homes: lights on relays (switch domain)', () => {
+  const named = (entityId: string, name: string, area: string): AuraEntity => ({
+    ...entity(entityId, area),
+    name,
+  });
+  const home = [
+    named('switch.wohnzimmer_licht', 'Wohnzimmer Licht', 'Wohnzimmer'),
+    named('switch.wohnzimmer_deckenheizung', 'Wohnzimmer Deckenheizung', 'Wohnzimmer'),
+    named('switch.bad_licht_1', 'Bad Licht 1', 'Bad'),
+    named('switch.bad_licht_2', 'Bad Licht 2', 'Bad'),
+    named('light.deckenlampe_1', 'Deckenlampe 1', 'Flur'),
+    named('switch.flur_licht', 'Flur Licht', 'Flur'),
+    named('switch.essbereich_stromdose', 'Essbereich Stromdose', 'Essbereich'),
+  ];
+  const ids = (result: AuraEntity[] | null) => result?.map((e) => e.entityId) ?? null;
+
+  it('treats light-named switches as lights', () => {
+    expect(isLightLike(home[0])).toBe(true);
+    expect(isLightLike(home[1])).toBe(false);
+    expect(isLightLike(home[6])).toBe(false);
+  });
+
+  it('"Licht im Wohnzimmer aus" switches the relay, not the heating', () => {
+    const cmd = parseFastCommand('Licht im Wohnzimmer aus', 'Aura')!;
+    expect(ids(resolveTargets(cmd, home, undefined))).toEqual(['switch.wohnzimmer_licht']);
+  });
+
+  it('"Wohnzimmer Licht aus" works as well', () => {
+    const cmd = parseFastCommand('Wohnzimmer Licht aus', 'Aura')!;
+    expect(ids(resolveTargets(cmd, home, undefined))).toEqual(['switch.wohnzimmer_licht']);
+  });
+
+  it('"Licht an" in the bathroom switches both relays; in the hallway lights and relays', () => {
+    const cmd = parseFastCommand('Licht an', 'Aura')!;
+    expect(ids(resolveTargets(cmd, home, 'Bad'))).toEqual([
+      'switch.bad_licht_1',
+      'switch.bad_licht_2',
+    ]);
+    expect(ids(resolveTargets(cmd, home, 'Flur'))).toEqual([
+      'light.deckenlampe_1',
+      'switch.flur_licht',
+    ]);
   });
 });

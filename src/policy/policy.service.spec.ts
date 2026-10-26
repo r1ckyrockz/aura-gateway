@@ -52,6 +52,47 @@ describe('PolicyService', () => {
       expect(policy.canControl(child, entity('media_player.tv', 'Kids Room')).allowed).toBe(false);
     });
 
+    it('requires confirmation for confirmEntities patterns, whatever the domain', () => {
+      const strict = new PolicyService(
+        testConfig({
+          policy: { ...testConfig().policy, confirmEntities: ['name:*Door*relay', 'switch.car_*'] },
+        }),
+      );
+      const adult = strict.resolve({ speaker: 'alex' });
+      const relay = { ...entity('switch.haustuere_door_1_relay'), name: 'Haustuere Door 1 relay' };
+      expect(strict.canControl(adult, relay)).toEqual({
+        allowed: true,
+        requiresConfirmation: true,
+      });
+      expect(strict.canControl(adult, entity('switch.car_doorlock'))).toEqual({
+        allowed: true,
+        requiresConfirmation: true,
+      });
+      expect(strict.canControl(adult, entity('switch.coffee'))).toEqual({
+        allowed: true,
+        requiresConfirmation: false,
+      });
+    });
+
+    it('supports patterns in denyEntities', () => {
+      const strict = new PolicyService(
+        testConfig({
+          policy: {
+            ...testConfig().policy,
+            profiles: {
+              ...testConfig().policy.profiles,
+              guest: { allowDomains: ['*'], denyEntities: ['name:*heizung'] },
+            },
+          },
+        }),
+      );
+      const guest = strict.resolve({});
+      expect(strict.canRead(guest, { ...entity('switch.x'), name: 'Bad Deckenheizung' })).toBe(
+        false,
+      );
+      expect(strict.canRead(guest, { ...entity('switch.y'), name: 'Bad Licht' })).toBe(true);
+    });
+
     it('blocks read-only profiles', () => {
       const viewer = policy.resolve({ client: 'abc123' });
       const decision = policy.canControl(viewer, entity('light.kitchen'));

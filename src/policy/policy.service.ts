@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AURA_CONFIG } from '../config/config.module';
 import { ANY, CURRENT_ROOM, type AuraConfig } from '../config/aura-config.schema';
+import { matchesAny } from '../common/patterns';
 import type { AuraEntity } from '../home-assistant/ha.types';
 import type { Decision, Principal, PrincipalInput } from './policy.types';
 
@@ -39,14 +40,14 @@ export class PolicyService {
   }
 
   /** May the principal see this entity at all? */
-  canRead(principal: Principal, entity: Pick<AuraEntity, 'entityId'>): boolean {
-    return !principal.profile.denyEntities.includes(entity.entityId);
+  canRead(principal: Principal, entity: Pick<AuraEntity, 'entityId' | 'name'>): boolean {
+    return !matchesAny(principal.profile.denyEntities, entity);
   }
 
   /** May the principal change this entity? */
   canControl(
     principal: Principal,
-    entity: Pick<AuraEntity, 'entityId' | 'domain' | 'area'>,
+    entity: Pick<AuraEntity, 'entityId' | 'name' | 'domain' | 'area'>,
   ): Decision {
     const { profile, profileName } = principal;
     if (profile.readOnly) {
@@ -75,7 +76,9 @@ export class PolicyService {
     }
     return {
       allowed: true,
-      requiresConfirmation: this.config.policy.confirmDomains.includes(entity.domain),
+      requiresConfirmation:
+        this.config.policy.confirmDomains.includes(entity.domain) ||
+        matchesAny(this.config.policy.confirmEntities, entity),
     };
   }
 }

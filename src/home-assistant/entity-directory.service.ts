@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AURA_CONFIG } from '../config/config.module';
 import type { AuraConfig } from '../config/aura-config.schema';
 import { errorMessage } from '../common/errors';
+import { matchesAny, type PatternTarget } from '../common/patterns';
 import { HomeAssistantClient } from './ha.client';
 import { domainOf, type AuraEntity, type HaState } from './ha.types';
 
@@ -20,11 +21,11 @@ export class EntityDirectory {
     @Inject(AURA_CONFIG) private readonly config: AuraConfig,
   ) {}
 
-  isExposed(entityId: string): boolean {
+  isExposed(target: PatternTarget): boolean {
     const { domains, includeEntities, excludeEntities } = this.config.homeAssistant.exposure;
-    if (excludeEntities.includes(entityId)) return false;
-    if (includeEntities.includes(entityId)) return true;
-    return domains.includes(domainOf(entityId));
+    if (matchesAny(excludeEntities, target)) return false;
+    if (matchesAny(includeEntities, target)) return true;
+    return domains.includes(domainOf(target.entityId));
   }
 
   async list(): Promise<AuraEntity[]> {
@@ -33,14 +34,15 @@ export class EntityDirectory {
 
     const [states, areas] = await Promise.all([this.ha.getStates(), this.loadAreas()]);
     const entities = states
-      .filter((s) => this.isExposed(s.entity_id))
+      .filter((s) =>
+        this.isExposed({ entityId: s.entity_id, name: s.attributes.friendly_name ?? s.entity_id }),
+      )
       .map((s) => toEntity(s, areas.get(s.entity_id) ?? null));
     this.cache = { at: Date.now(), entities };
     return entities;
   }
 
   async get(entityId: string): Promise<AuraEntity | undefined> {
-    if (!this.isExposed(entityId)) return undefined;
     const entities = await this.list();
     return entities.find((e) => e.entityId === entityId);
   }

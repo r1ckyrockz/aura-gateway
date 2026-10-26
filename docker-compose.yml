@@ -1,23 +1,27 @@
-# Quick start: AURA Gateway + Ollama on one box.
+# AURA Gateway, optionally with Ollama on the same box.
 #   cp .env.example .env && cp examples/aura.config.yaml aura.config.yaml
-#   docker compose up -d && docker compose exec ollama ollama pull qwen3:8b
+#
+# Gateway only (LLM elsewhere, e.g. LM Studio on a Mac; set LLM_BASE_URL in .env):
+#   docker compose up -d --build
+#
+# Gateway + Ollama:
+#   set LLM_BASE_URL=http://ollama:11434/v1 in .env, then:
+#   docker compose --profile ollama up -d --build
+#   docker compose exec ollama ollama pull qwen3:8b
 services:
   aura-gateway:
     build: .
     image: ghcr.io/r1ckyrockz/aura-gateway:latest
     restart: unless-stopped
     env_file: .env
-    environment:
-      LLM_BASE_URL: http://ollama:11434/v1
     ports:
       - '8080:8080'
     volumes:
       - ./aura.config.yaml:/config/aura.config.yaml:ro
-    depends_on:
-      - ollama
 
   ollama:
     image: ollama/ollama:latest
+    profiles: [ollama]
     restart: unless-stopped
     volumes:
       - ollama:/root/.ollama
