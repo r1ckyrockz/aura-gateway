@@ -102,7 +102,10 @@ export function classifyReply(
   const startsWith = (list: string[]) =>
     list.some((phrase) => normalized === phrase || normalized.startsWith(`${phrase} `));
 
-  if (startsWith(set.no) || startsWith(PHRASES.en.no)) return 'no';
-  if (words.length <= 4 && (startsWith(set.yes) || startsWith(PHRASES.en.yes))) return 'yes';
+  // Accept yes/no in every supported language: people answer in whatever language comes naturally.
+  const all = Object.values(PHRASES);
+  if (startsWith(set.no) || all.some((p) => startsWith(p.no))) return 'no';
+  if (words.length <= 4 && (startsWith(set.yes) || all.some((p) => startsWith(p.yes))))
+    return 'yes';
   return 'other';
 }

@@ -4,7 +4,9 @@
 
 assistant:
   name: Aura
-  language: en # reply language for built-in phrases and the prompt (en, de, ...)
+  language: en # default language when an utterance gives no clear signal
+  detectLanguage: true # answer in the language each utterance was spoken in
+  languages: [en, de]
   timezone: Europe/Berlin
   maxToolIterations: 6
   persona: |

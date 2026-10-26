@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Per-utterance language detection (`assistant.detectLanguage`, `assistant.languages`): AURA answers in the language you speak, keeps the previous language for ambiguous utterances, and exposes `language` in responses and events
+
+### Changed
+
+- Confirmations accept yes/no in every supported language (e.g. "ja" to an English question)
+- The system prompt names the reply language explicitly
+
 ## [0.2.0] - 2026-10-26
 
 ### Added

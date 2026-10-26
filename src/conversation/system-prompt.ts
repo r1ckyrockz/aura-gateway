@@ -1,6 +1,7 @@
 import type { AuraConfig } from '../config/aura-config.schema';
 import type { AuraEntity } from '../home-assistant/ha.types';
 import type { Principal } from '../policy/policy.types';
+import { languageName } from './language';
 
 export interface PromptInput {
   config: AuraConfig;
@@ -8,17 +9,26 @@ export interface PromptInput {
   now: Date;
   entities?: AuraEntity[];
   homeAssistantEnabled: boolean;
+  /** Language to answer in. */
+  language: string;
+  /** True if the language was detected from this utterance (or set explicitly by the client). */
+  languageCertain: boolean;
 }
 
 /** Builds the system prompt. Kept short on purpose: small local models follow short prompts better. */
 export function buildSystemPrompt({
+  language,
+  languageCertain,
   config,
   principal,
   now,
   entities,
   homeAssistantEnabled,
 }: PromptInput): string {
-  const { name, language, persona, timezone } = config.assistant;
+  const { name, persona, timezone } = config.assistant;
+  const languageLine = languageCertain
+    ? `The user is speaking ${languageName(language)}. Answer in ${languageName(language)}.`
+    : `Answer in the language the user speaks. If unclear, use ${languageName(language)}.`;
   const localTime = new Intl.DateTimeFormat('en-GB', {
     dateStyle: 'full',
     timeStyle: 'short',
@@ -27,7 +37,7 @@ export function buildSystemPrompt({
 
   const lines = [
     `You are ${name}, a private voice assistant running locally in a family home.`,
-    `Always answer in the language with code "${language}" unless the user clearly speaks another language.`,
+    languageLine,
     'Your answers are usually spoken aloud: be brief (one or two sentences), no markdown, no lists, no emojis.',
     `Current local time: ${localTime} (${timezone}).`,
     `The current user has the profile "${principal.profileName}"${principal.speaker ? ` (speaker: ${principal.speaker})` : ''}.`,

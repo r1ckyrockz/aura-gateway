@@ -15,6 +15,7 @@ import { MetricsService } from '../metrics/metrics.service';
 import { ConversationStore, type ConversationState } from './conversation.store';
 import type { ActionRecord, ConverseInput, ConverseResult } from './conversation.types';
 import { FastPathService } from './fast-path.service';
+import { detectLanguage } from './language';
 import { classifyReply, phrases } from './phrases';
 import { buildSystemPrompt } from './system-prompt';
 
@@ -83,7 +84,7 @@ export class ConversationService {
     this.events.emit({
       ...meta,
       type: 'conversation.answered',
-      data: { text: result.text, route: result.route, durationMs },
+      data: { text: result.text, route: result.route, language: result.language, durationMs },
     });
     return result;
   }
@@ -93,8 +94,8 @@ export class ConversationService {
     conversationId: string,
     principal: Principal,
   ): Promise<ConverseResult> {
-    const language = input.language ?? this.config.assistant.language;
     const state = this.store.get(conversationId);
+    const { language, certain: languageCertain } = this.resolveLanguage(input, state);
     const say = phrases(language);
     const base = { conversationId, principal: describe(principal) };
 
@@ -117,7 +118,7 @@ export class ConversationService {
         );
         return {
           ...base,
-          ...empty(say.cancelled),
+          ...empty(say.cancelled, language),
           actions: [
             { tool: 'confirmation', arguments: { summary }, status: 'ok', result: 'cancelled' },
           ],
@@ -134,7 +135,7 @@ export class ConversationService {
         { role: 'user', content: input.text },
         { role: 'assistant', content: fast.text },
       );
-      return { ...base, ...empty(fast.text), route: 'fast_path', actions: fast.actions };
+      return { ...base, ...empty(fast.text, language), route: 'fast_path', actions: fast.actions };
     }
 
     // 3. LLM ⇄ tools loop.
@@ -146,7 +147,7 @@ export class ConversationService {
     };
     const history = input.history ?? state.history;
     const messages: ChatMessage[] = [
-      { role: 'system', content: await this.systemPrompt(principal) },
+      { role: 'system', content: await this.systemPrompt(principal, language, languageCertain) },
       ...history,
       { role: 'user', content: input.text },
     ];
@@ -215,20 +216,28 @@ export class ConversationService {
       { role: 'user', content: input.text },
       { role: 'assistant', content: finalText },
     );
-    return { ...base, text: finalText, route: 'llm', actions, pendingConfirmation, usage };
+    return {
+      ...base,
+      text: finalText,
+      route: 'llm',
+      language,
+      actions,
+      pendingConfirmation,
+      usage,
+    };
   }
 
   /** Explicit confirmation via API (e.g. a button in the app or on a satellite display). */
   async resolvePending(conversationId: string, approve: boolean, language?: string) {
-    const lang = language ?? this.config.assistant.language;
     const state = this.store.get(conversationId);
+    const lang = language ?? state.language ?? this.config.assistant.language;
     const say = phrases(lang);
-    if (!state.pending) return { conversationId, ...empty(say.nothingPending) };
+    if (!state.pending) return { conversationId, ...empty(say.nothingPending, lang) };
     const principal = this.policy.resolve({});
     if (!approve) {
       this.store.clearPending(state);
       this.emitResolved(conversationId, principal, 'rejected');
-      return { conversationId, ...empty(say.cancelled) };
+      return { conversationId, ...empty(say.cancelled, lang) };
     }
     const outcome = await this.runPending(state, lang);
     this.emitResolved(conversationId, principal, 'approved');
@@ -253,7 +262,7 @@ export class ConversationService {
       const data = await pending.run();
       this.store.append(state, { role: 'assistant', content: say.done });
       return {
-        ...empty(say.done),
+        ...empty(say.done, language),
         actions: [
           {
             tool: pending.tool,
@@ -266,7 +275,7 @@ export class ConversationService {
     } catch (error) {
       this.logger.warn(`Confirmed action failed: ${errorMessage(error)}`);
       return {
-        ...empty(say.failed),
+        ...empty(say.failed, language),
         actions: [
           {
             tool: pending.tool,
@@ -279,7 +288,33 @@ export class ConversationService {
     }
   }
 
-  private async systemPrompt(principal: Principal): Promise<string> {
+  /**
+   * Language for this turn: explicit request field → detected from the utterance →
+   * previous language of the conversation → configured default.
+   */
+  private resolveLanguage(
+    input: ConverseInput,
+    state: ConversationState,
+  ): { language: string; certain: boolean } {
+    const { language: fallback, detectLanguage: detect, languages } = this.config.assistant;
+    let result: { language: string; certain: boolean };
+    if (input.language) {
+      result = { language: input.language, certain: true };
+    } else {
+      const detected = detect ? detectLanguage(input.text, languages) : null;
+      result = detected
+        ? { language: detected, certain: true }
+        : { language: detect ? (state.language ?? fallback) : fallback, certain: !detect };
+    }
+    state.language = result.language;
+    return result;
+  }
+
+  private async systemPrompt(
+    principal: Principal,
+    language: string,
+    languageCertain: boolean,
+  ): Promise<string> {
     const { injectEntities, injectEntitiesLimit } = this.config.homeAssistant;
     let entities;
     if (this.ha.enabled && injectEntities && injectEntitiesLimit > 0) {
@@ -298,6 +333,8 @@ export class ConversationService {
       now: new Date(),
       entities,
       homeAssistantEnabled: this.ha.enabled,
+      language,
+      languageCertain,
     });
   }
 }
@@ -311,9 +348,13 @@ function describe(principal: Principal): ConverseResult['principal'] {
   };
 }
 
-function empty(text: string): Omit<ConverseResult, 'conversationId' | 'principal'> {
+function empty(
+  text: string,
+  language: string,
+): Omit<ConverseResult, 'conversationId' | 'principal'> {
   return {
     text,
+    language,
     route: 'confirmation',
     actions: [],
     pendingConfirmation: null,

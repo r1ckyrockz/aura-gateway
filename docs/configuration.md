@@ -42,13 +42,15 @@ Every key is optional. A complete, commented example is in [`examples/aura.confi
 
 ### `assistant`
 
-| Key                 | Default          | Description                                                                                                                                                       |
-| ------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`              | `Aura`           | Name used in the prompt; it is also stripped from replies like "Aura, yes"                                                                                        |
-| `language`          | `en`             | Reply language. Built-in phrases exist for `en` and `de`; other languages fall back to English for those phrases, while the model still answers in your language. |
-| `persona`           | `""`             | Extra instructions appended to the system prompt                                                                                                                  |
-| `timezone`          | system time zone | IANA time zone, used for the time in the prompt and `get_time`                                                                                                    |
-| `maxToolIterations` | `6`              | Upper bound on LLM ⇄ tool round trips per request                                                                                                                 |
+| Key                 | Default          | Description                                                                         |
+| ------------------- | ---------------- | ----------------------------------------------------------------------------------- |
+| `name`              | `Aura`           | Name used in the prompt; it is also stripped from replies like "Aura, yes"          |
+| `language`          | `en`             | Default language: used when an utterance gives no clear signal and detection is off |
+| `detectLanguage`    | `true`           | Detect the language of each utterance and answer in it                              |
+| `languages`         | `[en, de]`       | Languages considered by detection                                                   |
+| `persona`           | `""`             | Extra instructions appended to the system prompt                                    |
+| `timezone`          | system time zone | IANA time zone, used for the time in the prompt and `get_time`                      |
+| `maxToolIterations` | `6`              | Upper bound on LLM ⇄ tool round trips per request                                   |
 
 ### `conversation`
 
@@ -57,6 +59,21 @@ Every key is optional. A complete, commented example is in [`examples/aura.confi
 | `ttlSeconds`             | `300`   | Forget a conversation after this much inactivity |
 | `maxHistoryMessages`     | `12`    | User/assistant messages kept per conversation    |
 | `confirmationTtlSeconds` | `60`    | How long a held action waits for "yes"           |
+
+### Languages
+
+AURA answers in the language you speak, per utterance. Say "Licht aus" and the answer is German; ask "What's the weather?" next and it switches to English. This is how the language for a turn is chosen:
+
+1. `language` in the request (`POST /v1/conversation`), if set.
+2. The language detected from the utterance, among `assistant.languages`.
+3. The language of the previous turn in the same conversation, when the utterance gives no clear signal ("OK", "Netflix").
+4. `assistant.language`.
+
+Confirmations accept "yes"/"no" in every supported language, so answering an English question with "ja" works.
+
+Built-in phrases (fast-path replies, confirmation questions) exist for English and German. For other languages the model still answers in the right language, but built-in phrases fall back to English. Contributions for more languages are welcome: add a phrase set in `src/conversation/phrases.ts` and markers in `src/conversation/language.ts`.
+
+Speech-to-text and text-to-speech live in the voice pipeline, not in the Gateway. Use a multilingual STT model (e.g. Whisper without the `.en` suffix) and a TTS voice per language.
 
 ### `fastPath`
 
