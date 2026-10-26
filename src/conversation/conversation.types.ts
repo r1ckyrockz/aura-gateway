@@ -26,6 +26,8 @@ export interface ConverseResult {
   text: string;
   /** How the answer was produced. */
   route: Route;
+  /** Language the answer is in (detected per utterance unless overridden). */
+  language: string;
   principal: { profile: string; resolvedBy: string; speaker?: string; room?: string };
   actions: ActionRecord[];
   pendingConfirmation: { id: string; summary: string; expiresAt: string } | null;

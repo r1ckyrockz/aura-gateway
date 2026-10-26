@@ -194,6 +194,19 @@ describe('AURA Gateway (e2e)', () => {
     expect(llm.requests.length).toBe(before);
   });
 
+  it('answers in the language of the utterance', async () => {
+    const { body } = await request(app.getHttpServer())
+      .post('/v1/conversation')
+      .set(auth)
+      .send({ text: 'Schalte bitte das Kitchen Light ein' })
+      .expect(200);
+    expect(body).toMatchObject({
+      route: 'fast_path',
+      language: 'de',
+      text: 'Kitchen Light ist jetzt an.',
+    });
+  });
+
   it('GET /metrics exposes Prometheus metrics behind auth', async () => {
     await request(app.getHttpServer()).get('/metrics').expect(401);
     const res = await request(app.getHttpServer()).get('/metrics').set(auth).expect(200);

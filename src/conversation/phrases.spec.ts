@@ -9,6 +9,8 @@ describe('classifyReply', () => {
     ['No', 'en', 'no'],
     ['Nein, lieber nicht', 'de', 'no'],
     ['cancel that', 'de', 'no'],
+    ['Ja', 'en', 'yes'],
+    ['nein danke', 'en', 'no'],
     ['yes and also turn on all the lights in the house', 'en', 'other'],
     ['what is the weather', 'en', 'other'],
   ])('%s (%s) → %s', (text, language, expected) => {

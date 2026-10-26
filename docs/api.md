@@ -26,7 +26,7 @@ Send an utterance and get back a speakable answer.
 | `conversationId` |          | Reuse it to continue a conversation; needed for follow-ups and confirmations. Generated if missing. |
 | `speaker`        |          | Identified speaker id → `policy.speakers`                                                           |
 | `room`           |          | Area the request comes from → room awareness and `policy.rooms`                                     |
-| `language`       |          | Overrides `assistant.language` for this request                                                     |
+| `language`       |          | Forces the reply language for this request (otherwise detected per utterance)                       |
 
 Response:
 
@@ -50,9 +50,12 @@ Response:
   ],
   "pendingConfirmation": null,
   "route": "llm",
+  "language": "en",
   "usage": { "promptTokens": 790, "completionTokens": 22, "llmCalls": 2 }
 }
 ```
+
+`language` is the language of the answer: detected per utterance unless forced (see [Languages](configuration.md#languages)).
 
 `route` says how the answer was produced: `fast_path` (simple command, no LLM), `llm` or `confirmation` (a reply to a held action).
 
@@ -90,7 +93,7 @@ A Server-Sent Events stream of conversation lifecycle events, for satellites, di
 | `tool.executed`          | `{ tool, status }`                             |
 | `confirmation.requested` | `{ id, summary, expiresAt }`                   |
 | `confirmation.resolved`  | `{ outcome: approved \| rejected \| dropped }` |
-| `conversation.answered`  | `{ text, route, durationMs }`                  |
+| `conversation.answered`  | `{ text, route, language, durationMs }`        |
 | `ping`                   | heartbeat every 25 s                           |
 
 Every event carries `type`, `conversationId`, `room`, `speaker` and `at`.

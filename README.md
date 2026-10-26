@@ -69,6 +69,7 @@ flowchart LR
 - 🏠 **Home Assistant tools:** list, read and control entities, with area awareness ("turn off the light" means the light in the room you're in).
 - 🛡️ **Household policy:** profiles per speaker, room or API key; allowed domains; per-room limits through `$room`; deny lists; read-only profiles.
 - ⚡ **Fast path** for simple on/off commands in English and German. No LLM round trip, same policy.
+- 🌍 **Answers in the language you speak**, per utterance. Mixed-language households work, including "ja" to an English question.
 - 📡 **Event stream** (`/v1/events`, Server-Sent Events) for satellites, displays and dashboards, filterable by room.
 - 📈 **Prometheus metrics** at `/metrics`: latency per route, LLM time and tokens, tool calls.
 - ✅ **Deterministic confirmations** for sensitive domains (`lock`, `alarm_control_panel`, … you choose which).

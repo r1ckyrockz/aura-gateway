@@ -8,6 +8,8 @@ export interface ConversationState {
   id: string;
   /** Only user/assistant text turns — tool chatter is not persisted. */
   history: ChatMessage[];
+  /** Language of the last utterance — used when the next one gives no clear signal ("OK"). */
+  language?: string;
   pending?: PendingAction & { expiresAt: number };
   updatedAt: number;
 }

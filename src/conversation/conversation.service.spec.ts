@@ -277,6 +277,79 @@ describe('fast path', () => {
   });
 });
 
+describe('languages', () => {
+  const unlock = [
+    {
+      tool: 'ha_call_service',
+      args: { domain: 'lock', service: 'unlock', entity_id: 'lock.front_door' },
+    },
+  ];
+  const systemPrompt = (llm: { requests: { messages: { content: string | null }[] }[] }, i = 0) =>
+    llm.requests[i].messages[0].content as string;
+
+  it('answers fast-path commands in the language they were spoken in', async () => {
+    const { service } = setup([]); // configured language: en
+    const de = await service.converse({ text: 'Licht aus', speaker: 'alex', room: 'Kids Room' });
+    expect(de).toMatchObject({ language: 'de', text: 'Kids Light ist jetzt aus.' });
+    const en = await service.converse({ text: 'Turn on the kitchen light', speaker: 'alex' });
+    expect(en).toMatchObject({ language: 'en', text: 'Kitchen Light is now on.' });
+  });
+
+  it('accepts a German "ja" to an English confirmation question', async () => {
+    const { service, ha } = setup([unlock]);
+    const ask = await service.converse({
+      text: 'Unlock the front door',
+      speaker: 'alex',
+      conversationId: 'l1',
+    });
+    expect(ask.text).toMatch(/^Just to be sure/);
+    const reply = await service.converse({ text: 'Ja', speaker: 'alex', conversationId: 'l1' });
+    expect(reply).toMatchObject({ text: 'Erledigt.', language: 'de' });
+    expect(ha.callService).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells the model which language to answer in', async () => {
+    const config = testConfig({ assistant: { language: 'de', timezone: 'UTC' } });
+    const { service, llm } = setup(['It is sunny.'], config);
+    await service.converse({ text: 'What is the weather like today?', speaker: 'alex' });
+    expect(systemPrompt(llm)).toContain('The user is speaking English. Answer in English.');
+  });
+
+  it('keeps the previous language when an utterance gives no signal', async () => {
+    const { service, llm } = setup(['Gerne.', 'Okay.']);
+    await service.converse({
+      text: 'Wie ist das Wetter heute?',
+      speaker: 'alex',
+      conversationId: 'l2',
+    });
+    const result = await service.converse({ text: 'OK', speaker: 'alex', conversationId: 'l2' });
+    expect(result.language).toBe('de');
+    expect(systemPrompt(llm, 1)).toContain('If unclear, use German.');
+  });
+
+  it('can be switched off', async () => {
+    const config = testConfig({ assistant: { detectLanguage: false, timezone: 'UTC' } });
+    const { service } = setup([], config);
+    const result = await service.converse({
+      text: 'Licht aus',
+      speaker: 'alex',
+      room: 'Kids Room',
+    });
+    expect(result).toMatchObject({ language: 'en', text: 'Kids Light is now off.' });
+  });
+
+  it('honours an explicit language from the client', async () => {
+    const { service } = setup([]);
+    const result = await service.converse({
+      text: 'Licht aus',
+      speaker: 'alex',
+      room: 'Kids Room',
+      language: 'en',
+    });
+    expect(result.text).toBe('Kids Light is now off.');
+  });
+});
+
 describe('events & metrics', () => {
   it('emits lifecycle events and records metrics', async () => {
     const { service, emitted, metrics } = setup([]);

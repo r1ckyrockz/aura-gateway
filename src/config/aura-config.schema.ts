@@ -23,6 +23,13 @@ export const auraConfigSchema = z.object({
       name: z.string().default('Aura'),
       /** BCP-47 language used for replies and built-in phrases (`en`, `de`, ...). */
       language: z.string().default('en'),
+      /**
+       * Detect the language of each utterance and answer in it (falls back to the conversation's
+       * previous language, then to `language`). Disable to always answer in `language`.
+       */
+      detectLanguage: z.boolean().default(true),
+      /** Languages considered by detection. Built-in phrases exist for `en` and `de`. */
+      languages: z.array(z.string()).min(1).default(['en', 'de']),
       /** Extra instructions appended to the system prompt. */
       persona: z.string().default(''),
       timezone: z.string().default(Intl.DateTimeFormat().resolvedOptions().timeZone),
