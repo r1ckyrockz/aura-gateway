@@ -9,7 +9,7 @@ export const profileSchema = z.object({
   description: z.string().optional(),
   /** Domains this profile may act on, e.g. `light`, `cover`. `*` allows everything. */
   allowDomains: z.array(z.string()).default([]),
-  /** Entities that are always off-limits for this profile. */
+  /** Entities that are always off-limits for this profile (patterns, see docs). */
   denyEntities: z.array(z.string()).default([]),
   /** If set, actions are limited to entities in these areas. `$room` = the requesting room. */
   areas: z.array(z.string()).optional(),
@@ -71,7 +71,9 @@ export const auraConfigSchema = z.object({
               'lock',
               'vacuum',
             ]),
+          /** Patterns: exact id, glob on the id (`switch.*_relay`) or `name:` glob. */
           includeEntities: z.array(z.string()).default([]),
+          /** Patterns; exclusion wins over inclusion. */
           excludeEntities: z.array(z.string()).default([]),
         })
         .prefault({}),
@@ -86,6 +88,11 @@ export const auraConfigSchema = z.object({
       defaultProfile: z.string().default('guest'),
       /** Domains whose actions need an explicit "yes" from the user before they run. */
       confirmDomains: z.array(z.string()).default(['lock', 'alarm_control_panel']),
+      /**
+       * Entities whose actions need an explicit "yes", regardless of domain (patterns).
+       * Use it for things like door openers that are modelled as switches.
+       */
+      confirmEntities: z.array(z.string()).default([]),
       profiles: z.record(z.string(), profileSchema).default({
         owner: { allowDomains: [ANY], denyEntities: [], readOnly: false },
         guest: { allowDomains: ['light', 'media_player'], denyEntities: [], readOnly: false },

@@ -135,15 +135,16 @@ Open **http://localhost:8080/docs** for the interactive API reference.
 
 ## Documentation
 
-| Doc                                      | Contents                                                           |
-| ---------------------------------------- | ------------------------------------------------------------------ |
-| [Architecture](docs/architecture.md)     | Components, request lifecycle, design decisions                    |
-| [Configuration](docs/configuration.md)   | Environment variables and `aura.config.yaml` reference             |
-| [Household policy](docs/policy.md)       | Profiles, speakers, rooms, confirmations, and how they're enforced |
-| [Home Assistant](docs/home-assistant.md) | Tokens, exposure, using AURA as the Assist conversation agent      |
-| [API](docs/api.md)                       | Endpoints with examples                                            |
-| [Extending](docs/extending.md)           | Writing your own tools                                             |
-| [Roadmap](ROADMAP.md)                    | What's next                                                        |
+| Doc                                      | Contents                                                                            |
+| ---------------------------------------- | ----------------------------------------------------------------------------------- |
+| [Deployment](docs/deployment.md)         | Step by step: Proxmox/Docker, LM Studio on a Mac, Home Assistant Assist, smoke test |
+| [Architecture](docs/architecture.md)     | Components, request lifecycle, design decisions                                     |
+| [Configuration](docs/configuration.md)   | Environment variables and `aura.config.yaml` reference                              |
+| [Household policy](docs/policy.md)       | Profiles, speakers, rooms, confirmations, and how they're enforced                  |
+| [Home Assistant](docs/home-assistant.md) | Tokens, exposure, using AURA as the Assist conversation agent                       |
+| [API](docs/api.md)                       | Endpoints with examples                                                             |
+| [Extending](docs/extending.md)           | Writing your own tools                                                              |
+| [Roadmap](ROADMAP.md)                    | What's next                                                                         |
 
 ## Choosing a model
 

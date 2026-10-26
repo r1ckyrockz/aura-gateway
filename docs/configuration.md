@@ -82,40 +82,63 @@ Speech-to-text and text-to-speech live in the voice pipeline, not in the Gateway
 | `enabled` | `true`                              | Handle simple on/off commands without the LLM |
 | `domains` | `light, switch, fan, input_boolean` | Domains the fast path may switch              |
 
-The fast path recognises English ("turn off the kitchen light", "switch on the lights in the living room", "desk lamp on") and German ("Licht aus", "mach das Licht im Wohnzimmer an", "schalte die Stehlampe ein"). It acts only when the target is unambiguous and never for domains in `policy.confirmDomains`.
+The fast path treats `light` entities **and switches whose name contains a light word** ("Küche Licht", "Hallway Lamp") as lights, because many homes switch lights with relays. The fast path recognises English ("turn off the kitchen light", "switch on the lights in the living room", "desk lamp on") and German ("Licht aus", "mach das Licht im Wohnzimmer an", "schalte die Stehlampe ein"). It acts only when the target is unambiguous and never for domains in `policy.confirmDomains`.
 
 ### `homeAssistant`
 
-| Key                        | Default                                                                                                | Description                                            |
-| -------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| `exposure.domains`         | `light, switch, cover, climate, fan, media_player, scene, script, sensor, binary_sensor, lock, vacuum` | Domains visible to the model                           |
-| `exposure.includeEntities` | `[]`                                                                                                   | Extra entities outside those domains                   |
-| `exposure.excludeEntities` | `[]`                                                                                                   | Entities never shown, even if their domain is exposed  |
-| `injectEntities`           | `true`                                                                                                 | Put the visible entity list into the prompt            |
-| `injectEntitiesLimit`      | `150`                                                                                                  | Only inject if the list has at most this many entities |
-| `cacheSeconds`             | `10`                                                                                                   | Cache for `/api/states`                                |
+| Key                        | Default                                                                                                | Description                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `exposure.domains`         | `light, switch, cover, climate, fan, media_player, scene, script, sensor, binary_sensor, lock, vacuum` | Domains visible to the model                                                                         |
+| `exposure.includeEntities` | `[]`                                                                                                   | Extra entities outside those domains ([patterns](#entity-patterns))                                  |
+| `exposure.excludeEntities` | `[]`                                                                                                   | Entities never shown, even if their domain is exposed ([patterns](#entity-patterns)); exclusion wins |
+| `injectEntities`           | `true`                                                                                                 | Put the visible entity list into the prompt                                                          |
+| `injectEntitiesLimit`      | `150`                                                                                                  | Only inject if the list has at most this many entities                                               |
+| `cacheSeconds`             | `10`                                                                                                   | Cache for `/api/states`                                                                              |
 
 ### `policy`
 
 See [Household policy](policy.md) for how these keys work together.
 
-| Key              | Default                                        | Description                                     |
-| ---------------- | ---------------------------------------------- | ----------------------------------------------- |
-| `defaultProfile` | `guest`                                        | Profile used when nothing else matches          |
-| `confirmDomains` | `[lock, alarm_control_panel]`                  | Domains whose actions need an explicit "yes"    |
-| `profiles`       | `owner` (everything), `guest` (lights + media) | Named profiles (see below)                      |
-| `speakers`       | `{}`                                           | Speaker id → profile                            |
-| `rooms`          | `{}`                                           | Room/area → profile (for unidentified speakers) |
-| `clients`        | `{}`                                           | API key fingerprint → profile                   |
+| Key               | Default                                        | Description                                                                                           |
+| ----------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `defaultProfile`  | `guest`                                        | Profile used when nothing else matches                                                                |
+| `confirmDomains`  | `[lock, alarm_control_panel]`                  | Domains whose actions need an explicit "yes"                                                          |
+| `confirmEntities` | `[]`                                           | Entities whose actions need an explicit \"yes\", whatever their domain ([patterns](#entity-patterns)) |
+| `profiles`        | `owner` (everything), `guest` (lights + media) | Named profiles (see below)                                                                            |
+| `speakers`        | `{}`                                           | Speaker id → profile                                                                                  |
+| `rooms`           | `{}`                                           | Room/area → profile (for unidentified speakers)                                                       |
+| `clients`         | `{}`                                           | API key fingerprint → profile                                                                         |
 
 A profile has these keys:
 
 | Key            | Default   | Description                                                                        |
 | -------------- | --------- | ---------------------------------------------------------------------------------- |
 | `allowDomains` | `[]`      | Domains this profile may control. `*` allows all.                                  |
-| `denyEntities` | `[]`      | Entities this profile can neither see nor control                                  |
+| `denyEntities` | `[]`      | Entities this profile can neither see nor control ([patterns](#entity-patterns))   |
 | `areas`        | _(unset)_ | If set, control is limited to these areas. `$room` stands for the requesting room. |
 | `readOnly`     | `false`   | The profile may read states but never call services                                |
 | `description`  | —         | Free text                                                                          |
 
 Note: once you define `profiles`, the built-in `owner`/`guest` profiles are replaced. Make sure `defaultProfile` names one of yours.
+
+### Entity patterns
+
+`includeEntities`, `excludeEntities`, `denyEntities` and `confirmEntities` accept patterns:
+
+| Pattern               | Matches                                                     |
+| --------------------- | ----------------------------------------------------------- |
+| `light.kitchen`       | exactly this entity id                                      |
+| `switch.*_relay`      | glob on the entity id (`*` = anything, `?` = one character) |
+| `name:*Deckenheizung` | glob on the friendly name, case-insensitive                 |
+
+Example: hide heating relays that a thermostat controls, and require a "yes" for a door opener that Home Assistant models as a switch:
+
+```yaml
+homeAssistant:
+  exposure:
+    excludeEntities: ['name:*Deckenheizung', 'switch.*_permit_join']
+policy:
+  confirmEntities: ['name:*Door*relay', 'name:*Garage*']
+```
+
+Review the exposure with `GET /v1/entities` before you let anyone talk to AURA. The default domains include `switch`, and in many homes that covers far more than light switches.

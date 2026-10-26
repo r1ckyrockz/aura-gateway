@@ -7,7 +7,7 @@ AURA uses Home Assistant in two directions:
 
 ## 1. Connect AURA to Home Assistant
 
-1. In Home Assistant, open **your profile → Security → Long-lived access tokens** and create a token. Ideally use a dedicated `aura` user.
+1. In Home Assistant, open **your profile → Security → Long-lived access tokens** and create a token. Use a dedicated, **non-admin** `aura` user.
 2. Set the token in `.env`:
    ```env
    HA_URL=http://homeassistant.local:8123
@@ -15,7 +15,7 @@ AURA uses Home Assistant in two directions:
    ```
 3. Check: `curl http://localhost:8080/health/ready` should report `homeAssistant: up`.
 
-**Areas** come from Home Assistant's area registry (one template call, cached for 60 s). Assign your devices to areas. Room awareness and the `$room` policy depend on it.
+**Areas** come from Home Assistant's area, device and entity registries over the WebSocket API (cached for 60 s). An entity inherits its device's area unless it has its own. This works for non-admin users; if the WebSocket is unavailable, AURA falls back to the template API, which needs an admin user. Assign your devices to areas. Room awareness and the `$room` policy depend on it.
 
 **Exposure** is configured in AURA (`homeAssistant.exposure`), not through Home Assistant's "Expose to Assist" setting. That keeps AURA's view explicit and versionable. Start narrow and widen as needed.
 

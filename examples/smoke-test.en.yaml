@@ -1,0 +1,36 @@
+# Example smoke-test cases. Copy and adapt to your rooms and device names.
+# Cases with `action: true` switch real devices and only run with --with-actions.
+defaults:
+  speaker: parent_1
+  room: Living Room
+
+cases:
+  - text: What time is it?
+    expect: { route: llm, language: en }
+
+  - text: Which lights are on in the living room?
+    expect: { route: llm, noErrors: true }
+
+  - text: How warm is it in the office?
+    expect: { route: llm, noErrors: true }
+
+  - text: Turn off the light
+    action: true
+    expect: { route: fast_path }
+
+  - text: Switch on the lights in the kitchen
+    action: true
+    expect: { route: fast_path }
+
+  - text: Dim the living room lights to 30 percent
+    action: true
+    expect: { route: llm, noErrors: true }
+
+  - text: Unlock the front door
+    action: true
+    followUps: ['no']
+    expect: { confirmation: true }
+
+  - text: Licht aus
+    action: true
+    expect: { route: fast_path, language: de }

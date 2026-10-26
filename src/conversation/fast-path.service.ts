@@ -119,6 +119,30 @@ export class FastPathService {
   }
 }
 
+const LIGHT_SUFFIXES = [
+  'licht',
+  'lichter',
+  'lampe',
+  'lampen',
+  'leuchte',
+  'light',
+  'lights',
+  'lamp',
+  'lamps',
+];
+
+/**
+ * Lights plus switches that obviously switch a light ("Küche Licht", "Hallway Lamp").
+ * Many homes control lights with relays (Shelly etc.) that Home Assistant models as switches.
+ */
+export function isLightLike(entity: Pick<AuraEntity, 'domain' | 'name'>): boolean {
+  if (entity.domain === 'light') return true;
+  if (entity.domain !== 'switch') return false;
+  return normalizeText(entity.name)
+    .split(' ')
+    .some((word) => LIGHT_SUFFIXES.some((suffix) => word.endsWith(suffix)));
+}
+
 const sameArea = (entity: AuraEntity, room: string) =>
   entity.area !== null && normalizeArea(entity.area) === normalizeArea(room);
 
@@ -144,7 +168,7 @@ export function resolveTargets(
   if (GENERIC_LIGHT_WORDS.has(target)) {
     const area = room ?? requestRoom;
     if (!area) return null;
-    const lights = entities.filter((e) => e.domain === 'light' && sameArea(e, area));
+    const lights = entities.filter((e) => isLightLike(e) && sameArea(e, area));
     return lights.length > 0 ? lights : null;
   }
 

@@ -42,8 +42,11 @@ homeAssistant:
     # … plus these individual entities …
     includeEntities: []
     # … minus these.
+    # Patterns: exact id, glob on the id, or `name:` glob on the friendly name.
     excludeEntities:
       - switch.server_rack_power
+      - 'name:*Deckenheizung' # heating relays are controlled by thermostats
+      - 'switch.*_permit_join'
   injectEntities: true # put a compact device list into the prompt (fewer tool calls)
   injectEntitiesLimit: 150
   cacheSeconds: 10
@@ -53,6 +56,8 @@ policy:
   defaultProfile: guest
   # Actions on these domains are only executed after an explicit "yes".
   confirmDomains: [lock, alarm_control_panel, cover]
+  # … and for these entities, whatever their domain (door openers are often switches).
+  confirmEntities: ['name:*Door*relay']
 
   profiles:
     adult:

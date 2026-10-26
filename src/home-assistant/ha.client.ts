@@ -1,8 +1,10 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AURA_ENV } from '../config/config.module';
 import type { Env } from '../config/env.schema';
 import { UpstreamError } from '../common/errors';
 import { requestJson } from '../common/http';
+import { errorMessage } from '../common/errors';
+import { fetchAreaMap } from './ha-registry';
 import type { HaState } from './ha.types';
 
 /** Jinja template that returns `[{e: entity_id, a: area_name}]` in a single round-trip. */
@@ -13,6 +15,7 @@ export const AREA_TEMPLATE =
 /** Thin client for the Home Assistant REST API. */
 @Injectable()
 export class HomeAssistantClient {
+  private readonly logger = new Logger(HomeAssistantClient.name);
   private readonly baseUrl?: string;
 
   constructor(@Inject(AURA_ENV) private readonly env: Env) {
@@ -35,7 +38,24 @@ export class HomeAssistantClient {
     return this.request<HaState>(`/api/states/${encodeURIComponent(entityId)}`);
   }
 
+  /**
+   * entity_id → area name. Uses the WebSocket registry (works for non-admin users) and falls back
+   * to the REST template endpoint (admin only) if that fails.
+   */
   async getAreas(): Promise<Map<string, string | null>> {
+    if (!this.enabled)
+      throw new UpstreamError('home-assistant', 'Home Assistant is not configured');
+    try {
+      return await fetchAreaMap(this.baseUrl!, this.env.HA_TOKEN!, this.env.HA_TIMEOUT_MS);
+    } catch (error) {
+      this.logger.warn(
+        `Area registry via WebSocket failed (${errorMessage(error)}), trying template API`,
+      );
+    }
+    return this.getAreasViaTemplate();
+  }
+
+  private async getAreasViaTemplate(): Promise<Map<string, string | null>> {
     const raw = await this.request<unknown>('/api/template', { template: AREA_TEMPLATE });
     const rows = (typeof raw === 'string' ? JSON.parse(raw) : raw) as {
       e: string;
